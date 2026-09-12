@@ -2,6 +2,7 @@ package com.example.product.application.service;
 
 import com.example.product.application.dto.ProductRequest;
 import com.example.product.application.dto.ProductResponse;
+import com.example.product.domain.exception.InsufficientStockException;
 import com.example.product.domain.exception.ProductNotFoundByIdException;
 import com.example.product.application.mapper.ProductMapper;
 import com.example.product.domain.model.Product;
@@ -11,6 +12,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @AllArgsConstructor
@@ -71,5 +73,17 @@ public class ProductService {
 
     public boolean checkProductAvailability(Long id, int quantity) {
         return productRepository.existsByIdAndStockGreaterThanEqual(id, quantity);
+    }
+
+    @Transactional
+    public ProductResponse decrementStock(Long id, int quantity) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ProductNotFoundByIdException("Product not found with ID: " + id));
+        if (product.getStock() < quantity) {
+            throw new InsufficientStockException("Insufficient stock for product ID " + id + ". Available: " + product.getStock() + ", requested: " + quantity);
+        }
+        product.setStock(product.getStock() - quantity);
+        productRepository.save(product);
+        return productMapper.mapToProductResponse(product);
     }
 }
